@@ -169,7 +169,7 @@ func main() {
 				} else if strings.HasPrefix(typed, "smallint(") {
 					typed = "int2"
 					setSeq = true
-				} else if typed == "datetime" {
+				} else if strings.HasPrefix(typed, "datetime") {
 					typed = "timestamp with time zone"
 				} else if typed == "double" {
 					typed = "double precision"
@@ -215,6 +215,7 @@ func main() {
 			} else if strings.HasPrefix(linestr, "KEY") {
 				continue
 			} else if linestr == ");" {
+				outFi.WriteString(fmt.Sprintf("DROP TABLE IF EXISTS \"%s\";\n", currentTable))
 				outFi.WriteString(fmt.Sprintf("CREATE TABLE \"%s\" (\n", currentTable))
 				for k, v := range creationLines {
 					tSep := ","
