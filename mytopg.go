@@ -89,6 +89,28 @@ func main() {
 		linestr = strings.Replace(linestr, `\\`, "$$$$&&&$$$", -1)
 		linestr = strings.Replace(linestr, `\'`, "''", -1)
 		linestr = strings.Replace(linestr, "$$$$&&&$$$", `\\`, -1)
+		//support mysql8.0
+		linestr = strings.ReplaceAll(linestr, "`", "\"")
+		linestr = strings.Replace(linestr, "AUTO_INCREMENT", "", -1)
+		linestr = strings.Replace(linestr, "USING BTREE", ";", -1)
+
+		// expr := regexp.MustCompile("^\\)\\s+ENGINE(.*)?;")
+		// expr.ReplaceAllString(linestr, ");")
+		if strings.Contains(linestr, "ENGINE") {
+			linestr = ");"
+		}
+
+		if strings.Contains(linestr, "VIEW") && strings.HasSuffix(linestr, ";") && !strings.Contains(linestr, "DROP") {
+			idx := strings.Index(linestr, "VIEW")
+			linestr = "CREATE " + linestr[idx:]
+			linestr = strings.Replace(linestr, "*/;", ";", -1)
+			linestr += "\n"
+			viewName := strings.Split(linestr, "\"")[1]
+			outFi.WriteString(fmt.Sprintf("DROP VIEW IF EXISTS \"%s\";\n", viewName))
+			outFi.WriteString(linestr)
+			tables[viewName] = -1 //-1 is a sign that create a view
+			continue
+		}
 
 		//ignore comment lines
 		if strings.HasPrefix(linestr, "--") ||
@@ -96,6 +118,8 @@ func main() {
 			strings.HasPrefix(linestr, "LOCK TABLES") ||
 			strings.HasPrefix(linestr, "DROP TABLE") ||
 			strings.HasPrefix(linestr, "UNLOCK TABLES") ||
+			strings.HasPrefix(linestr, "SET") ||
+			strings.HasPrefix(linestr, "1 AS") ||
 			len(linestr) == 0 {
 			continue
 		}
@@ -115,7 +139,7 @@ func main() {
 				// solve null time content
 				linestr = strings.Replace(linestr, "'0000-00-00 00:00:00'", "NULL", -1)
 				outFi.WriteString(linestr + "\n")
-				tables[lastTable]++
+				tables[lastTable] += strings.Count(linestr, ")")
 			} else {
 				fmt.Println("\n ! Unknown line in main body: ", linestr)
 			}
@@ -276,6 +300,10 @@ func main() {
 	sort.Strings(keys)
 	formatStr := "|create table|%" + strconv.Itoa(maxNmaeLen) + "s|insert rows|%10d|\n"
 	for _, k := range keys {
+		if tables[k] == -1 {
+			formatStr = strings.Replace(formatStr, "table", " view", -1)
+			tables[k] = 0
+		}
 		fmt.Printf(formatStr, k, tables[k])
 	}
 	fmt.Printf("\n #all rows %d, table num %d, insert num %d\n", lineNum, tableNum, insertNum)
