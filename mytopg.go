@@ -138,6 +138,7 @@ func main() {
 					})
 				// solve null time content
 				linestr = strings.Replace(linestr, "'0000-00-00 00:00:00'", "NULL", -1)
+				linestr = strings.ReplaceAll(linestr, "\\", "")
 				outFi.WriteString(linestr + "\n")
 				tables[lastTable] += strings.Count(linestr, ")")
 			} else {
